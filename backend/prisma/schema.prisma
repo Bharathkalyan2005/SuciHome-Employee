@@ -1,0 +1,57 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum JobPosition {
+  CLEANER
+  SUPERVISOR
+  SAFETY_OFFICER
+  MANAGER
+}
+
+enum ApplicationStatus {
+  PENDING
+  SHORTLISTED
+  REJECTED
+}
+
+model Application {
+  id              String            @id // Format: SH-EMP-YYYYMMDD-XXXXX
+  fullName        String
+  mobile          String            @unique
+  email           String            @unique
+  gender          String
+  dateOfBirth     DateTime
+  aadhaarEnc      String            // AES-256 encrypted Aadhaar number
+  aadhaarHash     String            @unique // SHA-256 hash for fast duplicate detection
+  address         String
+  city            String
+  state           String
+  pinCode         String
+  position        JobPosition
+  experience      Int               // 0 to 20 years
+  preferredCities String[]          // Postgres string array
+  expectedSalary  Float
+  photoUrl        String            // Cloudinary image URL
+  aadhaarFrontUrl String            // Cloudinary image URL
+  aadhaarBackUrl  String            // Cloudinary image URL
+  resumeUrl       String?           // Optional Cloudinary PDF URL
+  status          ApplicationStatus @default(PENDING)
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  @@index([status])
+}
+
+model Admin {
+  id        String   @id @default(uuid())
+  username  String   @unique
+  password  String   // bcrypt hashed
+  name      String
+  createdAt DateTime @default(now())
+}
