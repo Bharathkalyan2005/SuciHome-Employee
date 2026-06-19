@@ -1,4 +1,4 @@
-import { Phone, Mail, MapPin, Sparkles } from 'lucide-react';
+import { Phone, Mail, MapPin } from 'lucide-react';
 
 export default function Footer() {
   return (
@@ -9,9 +9,12 @@ export default function Footer() {
           {/* Logo and About */}
           <div className="space-y-4">
             <div className="flex items-center space-x-2">
-              <div className="bg-brand-green p-2 rounded-lg border border-brand-gold/20">
-                <Sparkles className="h-5 w-5 text-brand-gold" />
-              </div>
+              <img 
+                src="/logo.png" 
+                alt="SuciHome Logo" 
+                className="h-[40px] w-auto" 
+                style={{ height: '40px', filter: 'brightness(0) invert(1)' }}
+              />
               <span className="text-xl font-extrabold tracking-tight font-sans">
                 Suci<span className="text-brand-gold">Home</span>
               </span>
@@ -53,10 +56,13 @@ export default function Footer() {
             <p className="text-sm text-gray-300">
               Managed and operated by <strong>VRC Pvt Ltd</strong>. Register as an employee to access health insurance, fixed salaries, career growth opportunities, and flexible working shifts.
             </p>
-            <div className="pt-2">
+            <div className="pt-2 flex flex-wrap gap-2">
               <span className="inline-block bg-brand-green text-brand-gold font-bold text-xs px-3 py-1 rounded-full uppercase tracking-wider border border-brand-gold/20">
                 Join India's Top Cleaning Team
               </span>
+              <a href="/my-earnings" className="inline-block bg-brand-gold hover:bg-brand-gold/90 text-brand-dark font-extrabold text-xs px-3 py-1.5 rounded-full uppercase tracking-wider transition-colors">
+                💰 Cleaner Login
+              </a>
             </div>
           </div>
 

@@ -12,6 +12,7 @@ import { encryptAadhaar, decryptAadhaar, hashAadhaar } from './utils/crypto';
 import { sendRegistrationNotifications, sendWhatsApp } from './utils/notifications';
 import { requireAdmin, AuthenticatedRequest } from './middleware/auth';
 import { authenticateAdmin } from './middleware/adminAuth';
+import earningsRouter from './routes/earnings.route';
 
 dotenv.config();
 
@@ -27,6 +28,9 @@ app.use(cors({
 }));
 
 app.use(express.json());
+
+// Register earnings and payouts router
+app.use('/api', earningsRouter);
 
 // Serve uploaded files statically for local development fallback
 app.use('/uploads', express.static(path.join(process.cwd(), 'public', 'uploads')));

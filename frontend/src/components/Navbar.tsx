@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Menu, X, Sparkles } from 'lucide-react';
+import { Menu, X } from 'lucide-react';
 
 export default function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
@@ -26,9 +26,12 @@ export default function Navbar() {
           {/* Logo Section */}
           <div className="flex items-center">
             <Link to="/" className="flex items-center space-x-2 group">
-              <div className="bg-brand-green p-2.5 rounded-xl transition-transform duration-300 group-hover:scale-105 shadow-md">
-                <Sparkles className="h-6 w-6 text-brand-gold" />
-              </div>
+              <img 
+                src="/logo.png" 
+                alt="SuciHome Logo" 
+                className="h-[44px] w-auto transition-transform duration-300 group-hover:scale-105" 
+                style={{ height: '44px' }}
+              />
               <div className="flex flex-col">
                 <span className="text-2xl font-extrabold tracking-tight text-brand-dark font-sans leading-none flex items-center">
                   Suci<span className="text-brand-gold">Home</span>
@@ -110,6 +113,17 @@ export default function Navbar() {
                 {link.name}
               </Link>
             ))}
+            <Link
+              to="/my-earnings"
+              onClick={() => setIsOpen(false)}
+              className={`block px-4 py-3 rounded-lg text-base font-semibold transition-all ${
+                isActive('/my-earnings')
+                  ? 'bg-brand-green text-white'
+                  : 'text-brand-text hover:bg-brand-lightGreen hover:text-brand-green'
+              }`}
+            >
+              💰 Cleaner Login
+            </Link>
             <button
               onClick={() => {
                 setIsOpen(false);

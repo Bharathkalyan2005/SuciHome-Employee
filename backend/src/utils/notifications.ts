@@ -1,4 +1,5 @@
 import dotenv from 'dotenv';
+import prisma from '../db/prisma';
 
 dotenv.config();
 
@@ -155,4 +156,63 @@ Content: (Visual Email template logged to terminal)
 =========================================
   `);
   return true;
+}
+
+/**
+ * On payout request submitted, alert HR
+ */
+export async function alertHRPayoutRequest(request: any) {
+  try {
+    const employee = await prisma.employee.findUnique({
+      where: { id: request.employeeId },
+      select: { fullName: true }
+    });
+    const name = employee?.fullName || 'Unknown';
+    const fromDateStr = new Date(request.fromDate).toLocaleDateString();
+    const toDateStr = new Date(request.toDate).toLocaleDateString();
+    
+    const body = `💰 New Payout Request — SuciHome
+
+Employee : ${name}
+Amount   : ₹${request.amount}
+Period   : ${fromDateStr} to ${toDateStr}
+Method   : ${request.method}
+Request ID: ${request.requestId}
+
+Review at: suci-home-employee.vercel.app/admin`;
+
+    await sendWhatsApp(HR_WHATSAPP_NUMBER, body, 'HR');
+  } catch (error) {
+    console.error('[Notification Error] Failed to alert HR of payout request:', error);
+  }
+}
+
+/**
+ * On payout marked PAID, confirm to employee
+ */
+export async function sendPayoutConfirmation(request: any) {
+  try {
+    const employee = await prisma.employee.findUnique({
+      where: { id: request.employeeId },
+      select: { fullName: true, mobile: true }
+    });
+    if (!employee) return;
+    
+    const paidAtStr = new Date(request.paidAt || new Date()).toLocaleDateString();
+    const paidViaStr = request.paidVia || 'N/A';
+    
+    const body = `Hi ${employee.fullName}! ✅ Your payout has been processed!
+
+Amount : ₹${request.amount}
+Method : ${request.method}
+Date   : ${paidAtStr}
+Ref    : ${paidViaStr}
+
+Thank you for your hard work! 
+— SuciHome HR Team ✦`;
+
+    await sendWhatsApp(employee.mobile, body, 'Applicant');
+  } catch (error) {
+    console.error('[Notification Error] Failed to send payout confirmation to employee:', error);
+  }
 }

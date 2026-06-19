@@ -12,6 +12,11 @@ api.interceptors.request.use(
       if (adminToken) {
         config.headers.Authorization = `Bearer ${adminToken}`;
       }
+    } else if (config.url?.includes('/employee')) {
+      const employeeToken = localStorage.getItem('sucihome_employee_token');
+      if (employeeToken) {
+        config.headers.Authorization = `Bearer ${employeeToken}`;
+      }
     } else {
       const token = localStorage.getItem('sparkclean_token');
       if (token) {

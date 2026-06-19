@@ -5,6 +5,7 @@ import { Toaster } from 'react-hot-toast';
 // Components
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
+import LoadingScreen from './components/LoadingScreen';
 
 // Pages
 import Home from './pages/Home';
@@ -21,6 +22,20 @@ const AdminPage = lazy(() =>
       default: () => (
         <div style={{ padding: '100px', textAlign: 'center' }}>
           <h2>Admin page failed to load</h2>
+          <p>{String(err)}</p>
+        </div>
+      ) 
+    };
+  })
+);
+
+const CleanerPortal = lazy(() => 
+  import('./pages/CleanerPortal').catch(err => {
+    console.error('CleanerPortal failed to load:', err);
+    return { 
+      default: () => (
+        <div style={{ padding: '100px', textAlign: 'center' }}>
+          <h2>Cleaner Portal failed to load</h2>
           <p>{String(err)}</p>
         </div>
       ) 
@@ -57,8 +72,13 @@ function App() {
             <Route path="/status" element={<Status />} />
             <Route path="/contact" element={<Contact />} />
             <Route path="/admin" element={
-              <Suspense fallback={<div className="py-20 text-center text-brand-green font-bold">Loading admin...</div>}>
+              <Suspense fallback={<LoadingScreen />}>
                 <AdminPage />
+              </Suspense>
+            } />
+            <Route path="/my-earnings" element={
+              <Suspense fallback={<LoadingScreen />}>
+                <CleanerPortal />
               </Suspense>
             } />
             <Route path="*" element={

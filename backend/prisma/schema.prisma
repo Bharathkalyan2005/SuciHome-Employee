@@ -55,3 +55,77 @@ model Admin {
   name      String
   createdAt DateTime @default(now())
 }
+
+model DailyEarning {
+  id            String        @id @default(cuid())
+  employeeId    String
+  employee      Employee      @relation(fields: [employeeId], references: [id])
+  date          DateTime      @db.Date
+  jobsCompleted Int           @default(0)
+  baseAmount    Decimal       @db.Decimal(10,2) @default(0)
+  bonusAmount   Decimal       @db.Decimal(10,2) @default(0)
+  totalAmount   Decimal       @db.Decimal(10,2)
+  notes         String?
+  addedBy       String        // admin id who logged it
+  status        EarningStatus @default(UNPAID)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  @@unique([employeeId, date])
+}
+
+model PayoutRequest {
+  id            String        @id @default(cuid())
+  requestId     String        @unique
+  employeeId    String
+  employee      Employee      @relation(fields: [employeeId], references: [id])
+  amount        Decimal       @db.Decimal(10,2)
+  fromDate      DateTime      @db.Date
+  toDate        DateTime      @db.Date
+  method        PayoutMethod  @default(UPI)
+  upiId         String?
+  bankAccount   String?
+  bankIfsc      String?
+  status        PayoutStatus  @default(PENDING)
+  adminNotes    String?
+  paidAt        DateTime?
+  paidVia       String?       // txn ref id
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+}
+
+enum EarningStatus {
+  UNPAID
+  REQUESTED
+  PAID
+}
+
+enum PayoutMethod {
+  UPI
+  BANK_TRANSFER
+  CASH
+}
+
+enum PayoutStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  PAID
+}
+
+model Employee {
+  id              String          @id @default(cuid())
+  applicationId   String?         @unique
+  fullName        String
+  mobile          String          @unique
+  email           String          @unique
+  city            String
+  jobPosition     JobPosition
+  status          String          @default("HIRED")
+  employeePin     String?         // 4-digit login PIN (hashed)
+  isActive        Boolean         @default(true)
+  dailyEarnings   DailyEarning[]
+  payoutRequests  PayoutRequest[]
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+}

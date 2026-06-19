@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import api from '../lib/axiosInstance'
 import toast from 'react-hot-toast'
-import { Users, Clock, CheckCircle, XCircle, Search, Download, MessageSquare, Eye, RefreshCw, Send, Check } from 'lucide-react'
+import { Users, Clock, CheckCircle, XCircle, Search, Download, MessageSquare, Eye, RefreshCw, Send, Check, DollarSign, Activity, PlusCircle } from 'lucide-react'
 
 interface Application {
   id: string;
@@ -111,14 +111,11 @@ export default function AdminPage() {
         >
           <div style={{ textAlign: 'center', marginBottom: '28px' }}>
             <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '12px' }}>
-              <div style={{
-                background: '#1B4332',
-                padding: '10px',
-                borderRadius: '12px',
-                color: '#D4AF37',
-              }}>
-                <span style={{ fontSize: '24px', fontWeight: 'bold' }}>⚙️</span>
-              </div>
+              <img 
+                src="/logo.png" 
+                alt="SuciHome Logo" 
+                style={{ height: '56px', width: 'auto' }}
+              />
             </div>
             <h2 style={{
               color     : '#0D2B1F',
@@ -219,6 +216,43 @@ export default function AdminPage() {
 }
 
 function AdminDashboard({ onLogout }: { onLogout: () => void }) {
+  const [currentView, setCurrentView] = useState<'applications' | 'earnings'>('applications');
+  
+  // Hiring states
+  const [showHireModal, setShowHireModal] = useState(false);
+  const [hirePin, setHirePin] = useState('');
+  const [hiring, setHiring] = useState(false);
+
+  // Earnings & Payouts state
+  const [activeEmployees, setActiveEmployees] = useState<any[]>([]);
+  const [earningsSummary, setEarningsSummary] = useState<any>({ todayTotal: 0, pendingPayouts: 0, monthTotal: 0, activeCleaners: 0 });
+  const [allEarnings, setAllEarnings] = useState<any[]>([]);
+  const [payoutRequests, setPayoutRequests] = useState<any[]>([]);
+  
+  // Filters for Earnings Table
+  const [earnEmployeeId, setEarnEmployeeId] = useState('');
+  const [earnCity, setEarnCity] = useState('');
+  const [earnFromDate, setEarnFromDate] = useState('');
+  const [earnToDate, setEarnToDate] = useState('');
+  const [earnStatus, setEarnStatus] = useState('');
+  const [selectedEarnIds, setSelectedEarnIds] = useState<string[]>([]);
+
+  // Log Earning Form State
+  const [logEmployeeId, setLogEmployeeId] = useState('');
+  const [logDate, setLogDate] = useState(() => new Date().toISOString().split('T')[0]);
+  const [logJobs, setLogJobs] = useState('');
+  const [logBase, setLogBase] = useState('');
+  const [logBonus, setLogBonus] = useState('');
+  const [logNotes, setLogNotes] = useState('');
+  const [logLoading, setLogLoading] = useState(false);
+
+  // Payout action modal state
+  const [payoutActionRequest, setPayoutActionRequest] = useState<any | null>(null);
+  const [payoutActionStatus, setPayoutActionStatus] = useState<'APPROVED' | 'REJECTED' | 'PAID'>('PAID');
+  const [paidTxnId, setPaidTxnId] = useState('');
+  const [payoutAdminNotes, setPayoutAdminNotes] = useState('');
+  const [payoutActionLoading, setPayoutActionLoading] = useState(false);
+
   const [applications, setApplications] = useState<Application[]>([]);
   const [stats, setStats] = useState<Stats>({ total: 0, pending: 0, shortlisted: 0, rejected: 0 });
   const [loading, setLoading] = useState(false);
@@ -261,6 +295,114 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
       }
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchEarningsData = async () => {
+    try {
+      const [empRes, summaryRes, earnRes, payoutRes] = await Promise.all([
+        api.get('/admin/employees/active'),
+        api.get('/admin/summary'),
+        api.get(`/admin/all?employeeId=${earnEmployeeId}&city=${earnCity}&fromDate=${earnFromDate}&toDate=${earnToDate}&status=${earnStatus}`),
+        api.get('/admin/payout-requests')
+      ]);
+
+      setActiveEmployees(empRes.data.employees);
+      setEarningsSummary(summaryRes.data);
+      setAllEarnings(earnRes.data.earnings);
+      setPayoutRequests(payoutRes.data.requests);
+    } catch (err) {
+      console.error('Error fetching earnings data:', err);
+      toast.error('Failed to sync earnings records');
+    }
+  };
+
+  useEffect(() => {
+    if (currentView === 'earnings') {
+      fetchEarningsData();
+    }
+  }, [currentView, earnEmployeeId, earnCity, earnFromDate, earnToDate, earnStatus]);
+
+  const handleLogEarning = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!logEmployeeId || !logDate || !logBase) {
+      toast.error('Please enter employee, date and base amount');
+      return;
+    }
+    setLogLoading(true);
+    try {
+      await api.post('/admin/log', {
+        employeeId: logEmployeeId,
+        date: logDate,
+        jobsCompleted: parseInt(logJobs) || 0,
+        baseAmount: parseFloat(logBase),
+        bonusAmount: parseFloat(logBonus) || 0,
+        notes: logNotes
+      });
+      toast.success('Daily earning logged successfully!');
+      setLogJobs('');
+      setLogBase('');
+      setLogBonus('');
+      setLogNotes('');
+      fetchEarningsData();
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || 'Failed to log daily earning');
+    } finally {
+      setLogLoading(false);
+    }
+  };
+
+  const handlePayoutAction = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!payoutActionRequest) return;
+    setPayoutActionLoading(true);
+    try {
+      await api.patch(`/admin/payout-requests/${payoutActionRequest.id}`, {
+        status: payoutActionStatus,
+        adminNotes: payoutAdminNotes,
+        paidVia: payoutActionStatus === 'PAID' ? paidTxnId : undefined
+      });
+      toast.success(`Payout request marked as ${payoutActionStatus}`);
+      setPayoutActionRequest(null);
+      setPaidTxnId('');
+      setPayoutAdminNotes('');
+      fetchEarningsData();
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || 'Failed to update payout status');
+    } finally {
+      setPayoutActionLoading(false);
+    }
+  };
+
+  const handleBulkPay = async () => {
+    if (selectedEarnIds.length === 0) return;
+    try {
+      await api.post('/admin/bulk-pay', { ids: selectedEarnIds });
+      toast.success('Marked selected entries as PAID');
+      setSelectedEarnIds([]);
+      fetchEarningsData();
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || 'Failed to pay selected entries');
+    }
+  };
+
+  const handleHire = async (appId: string) => {
+    if (!/^\d{4}$/.test(hirePin)) {
+      toast.error('PIN must be exactly 4 digits');
+      return;
+    }
+    setHiring(true);
+    try {
+      await api.post('/admin/employees/hire', { applicationId: appId, pin: hirePin });
+      toast.success('Candidate hired successfully! Employee record created.');
+      setShowHireModal(false);
+      setHirePin('');
+      fetchData();
+      setActiveApp(null);
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || 'Failed to hire candidate');
+    } finally {
+      setHiring(false);
     }
   };
 
@@ -357,8 +499,34 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
         </button>
       </div>
 
-      {/* Statistics Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-4 gap-6">
+      {/* Tabs */}
+      <div className="flex space-x-2 border-b border-brand-green/10 pb-4">
+        <button
+          onClick={() => setCurrentView('applications')}
+          className={`px-5 py-2.5 rounded-xl text-sm font-bold transition-all ${
+            currentView === 'applications'
+              ? 'bg-brand-green text-white shadow-sm'
+              : 'text-brand-text hover:bg-brand-lightGreen hover:text-brand-green'
+          }`}
+        >
+          📋 Applications Onboarding
+        </button>
+        <button
+          onClick={() => setCurrentView('earnings')}
+          className={`px-5 py-2.5 rounded-xl text-sm font-bold transition-all ${
+            currentView === 'earnings'
+              ? 'bg-brand-green text-white shadow-sm'
+              : 'text-brand-text hover:bg-brand-lightGreen hover:text-brand-green'
+          }`}
+        >
+          💰 Earnings & Payouts
+        </button>
+      </div>
+
+      {currentView === 'applications' && (
+        <>
+          {/* Statistics Cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-4 gap-6">
         <div className="bg-white p-6 rounded-2xl border border-brand-green/5 shadow-sm flex items-center justify-between">
           <div className="space-y-1">
             <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Total Applications</p>
@@ -604,6 +772,363 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
         </div>
 
       </div>
+      </>
+      )}
+
+      {/* Earnings & Payouts Tab View */}
+      {currentView === 'earnings' && (
+        <div className="space-y-8 animate-fade-in">
+          
+          {/* Summary Cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-4 gap-6">
+            <div className="bg-white p-6 rounded-2xl border border-brand-green/5 shadow-sm flex items-center justify-between">
+              <div className="space-y-1">
+                <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Today's Total Logged</p>
+                <h3 className="text-3xl font-extrabold text-brand-dark">₹{earningsSummary.todayTotal}</h3>
+              </div>
+              <div className="bg-brand-lightGreen p-3.5 rounded-xl text-brand-green">
+                <DollarSign className="h-6 w-6 text-brand-gold" />
+              </div>
+            </div>
+
+            <div className="bg-white p-6 rounded-2xl border border-brand-green/5 shadow-sm flex items-center justify-between">
+              <div className="space-y-1">
+                <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Pending Payouts</p>
+                <h3 className="text-3xl font-extrabold text-brand-gold">{earningsSummary.pendingPayouts}</h3>
+              </div>
+              <div className="bg-yellow-50 p-3.5 rounded-xl text-brand-gold">
+                <Clock className="h-6 w-6" />
+              </div>
+            </div>
+
+            <div className="bg-white p-6 rounded-2xl border border-brand-green/5 shadow-sm flex items-center justify-between">
+              <div className="space-y-1">
+                <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">This Month Total</p>
+                <h3 className="text-3xl font-extrabold text-green-700">₹{earningsSummary.monthTotal}</h3>
+              </div>
+              <div className="bg-green-50 p-3.5 rounded-xl text-green-600">
+                <Activity className="h-6 w-6" />
+              </div>
+            </div>
+
+            <div className="bg-white p-6 rounded-2xl border border-brand-green/5 shadow-sm flex items-center justify-between">
+              <div className="space-y-1">
+                <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Active Cleaners</p>
+                <h3 className="text-3xl font-extrabold text-brand-dark">{earningsSummary.activeCleaners}</h3>
+              </div>
+              <div className="bg-brand-lightGreen p-3.5 rounded-xl text-brand-green">
+                <Users className="h-6 w-6" />
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            
+            {/* Left Col: Log Daily Earning form */}
+            <div className="lg:col-span-1 space-y-6">
+              <div className="bg-white rounded-3xl p-6 border border-brand-green/10 shadow-sm space-y-6">
+                <h2 className="text-xl font-extrabold text-brand-dark flex items-center space-x-2 border-b border-brand-green/5 pb-2">
+                  <PlusCircle className="h-5 w-5 text-brand-gold" />
+                  <span>Log Daily Earning</span>
+                </h2>
+
+                <form onSubmit={handleLogEarning} className="space-y-4">
+                  <div className="space-y-1">
+                    <label className="block text-[10px] font-bold text-brand-dark uppercase tracking-wider">Select Employee</label>
+                    <select
+                      required
+                      value={logEmployeeId}
+                      onChange={e => setLogEmployeeId(e.target.value)}
+                      className="w-full px-3 py-2.5 rounded-xl border border-brand-green/20 focus:outline-none focus:ring-1 focus:ring-brand-gold bg-white text-xs text-brand-dark"
+                    >
+                      <option value="">-- Select Employee --</option>
+                      {activeEmployees.map((emp: any) => (
+                        <option key={emp.id} value={emp.id}>
+                          {emp.fullName} ({emp.jobPosition.toLowerCase()})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="block text-[10px] font-bold text-brand-dark uppercase tracking-wider">Date</label>
+                    <input
+                      type="date"
+                      required
+                      value={logDate}
+                      onChange={e => setLogDate(e.target.value)}
+                      className="w-full px-3 py-2.5 rounded-xl border border-brand-green/20 focus:outline-none focus:ring-1 focus:ring-brand-gold bg-white text-xs text-brand-dark cursor-pointer"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="block text-[10px] font-bold text-brand-dark uppercase tracking-wider">Jobs Completed</label>
+                    <input
+                      type="number"
+                      required
+                      placeholder="e.g. 3"
+                      value={logJobs}
+                      onChange={e => setLogJobs(e.target.value)}
+                      className="w-full px-3 py-2.5 rounded-xl border border-brand-green/20 focus:outline-none focus:ring-1 focus:ring-brand-gold bg-white text-xs text-brand-dark"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="block text-[10px] font-bold text-brand-dark uppercase tracking-wider">Base Amount (₹)</label>
+                    <input
+                      type="number"
+                      required
+                      placeholder="e.g. 450"
+                      value={logBase}
+                      onChange={e => setLogBase(e.target.value)}
+                      className="w-full px-3 py-2.5 rounded-xl border border-brand-green/20 focus:outline-none focus:ring-1 focus:ring-brand-gold bg-white text-xs text-brand-dark"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="block text-[10px] font-bold text-brand-dark uppercase tracking-wider">Bonus Amount (₹, optional)</label>
+                    <input
+                      type="number"
+                      placeholder="e.g. 50"
+                      value={logBonus}
+                      onChange={e => setLogBonus(e.target.value)}
+                      className="w-full px-3 py-2.5 rounded-xl border border-brand-green/20 focus:outline-none focus:ring-1 focus:ring-brand-gold bg-white text-xs text-brand-dark"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="block text-[10px] font-bold text-brand-dark uppercase tracking-wider">Notes (optional)</label>
+                    <textarea
+                      placeholder="Enter notes..."
+                      rows={2}
+                      value={logNotes}
+                      onChange={e => setLogNotes(e.target.value)}
+                      className="w-full px-3 py-2.5 rounded-xl border border-brand-green/20 focus:outline-none focus:ring-1 focus:ring-brand-gold bg-white text-xs text-brand-dark"
+                    />
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={logLoading}
+                    className="w-full bg-brand-green hover:bg-brand-green/90 text-white font-extrabold py-3 rounded-xl transition-all shadow-md disabled:opacity-50 text-xs"
+                  >
+                    {logLoading ? 'Saving Entry...' : 'Save Entry'}
+                  </button>
+                </form>
+              </div>
+            </div>
+
+            {/* Right Col: Earnings Table & Payout Requests (2 cols) */}
+            <div className="lg:col-span-2 space-y-6">
+              
+              {/* Payout Requests Tab */}
+              <div className="bg-white rounded-3xl p-6 border border-brand-green/10 shadow-sm space-y-4">
+                <h2 className="text-xl font-extrabold text-brand-dark border-b border-brand-green/5 pb-2">
+                  Payout Requests
+                </h2>
+                
+                {payoutRequests.length === 0 ? (
+                  <p className="text-center py-6 text-gray-400 font-semibold text-sm">No payout requests found.</p>
+                ) : (
+                  <div className="space-y-3 max-h-[300px] overflow-y-auto pr-1">
+                    {payoutRequests.map((req: any) => (
+                      <div key={req.id} className="p-4 bg-brand-cream/20 border border-brand-green/5 rounded-2xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 text-sm">
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <span className="font-extrabold text-brand-dark">{req.requestId}</span>
+                            <span className="text-[10px] font-bold text-gray-400">{req.employee.fullName} ({req.employee.city})</span>
+                          </div>
+                          <p className="text-xs text-brand-text font-semibold">
+                            ₹{req.amount} | {req.method} | {new Date(req.fromDate).toLocaleDateString()} to {new Date(req.toDate).toLocaleDateString()}
+                          </p>
+                          {req.method === 'UPI' && req.upiId && <p className="text-[10px] text-gray-400 font-mono">UPI ID: {req.upiId}</p>}
+                          {req.method === 'BANK_TRANSFER' && req.bankAccount && <p className="text-[10px] text-gray-400 font-mono">Bank: {req.bankAccount} | {req.bankIfsc}</p>}
+                        </div>
+                        <div className="flex gap-2 w-full sm:w-auto">
+                          {req.status === 'PENDING' ? (
+                            <>
+                              <button
+                                onClick={() => {
+                                  setPayoutActionRequest(req);
+                                  setPayoutActionStatus('APPROVED');
+                                }}
+                                className="bg-green-600 hover:bg-green-700 text-white font-bold px-3 py-1.5 rounded-lg text-xs"
+                              >
+                                Approve
+                              </button>
+                              <button
+                                onClick={() => {
+                                  setPayoutActionRequest(req);
+                                  setPayoutActionStatus('REJECTED');
+                                }}
+                                className="bg-red-600 hover:bg-red-700 text-white font-bold px-3 py-1.5 rounded-lg text-xs"
+                              >
+                                Reject
+                              </button>
+                            </>
+                          ) : req.status === 'APPROVED' ? (
+                            <button
+                              onClick={() => {
+                                setPayoutActionRequest(req);
+                                setPayoutActionStatus('PAID');
+                              }}
+                              className="bg-brand-gold hover:bg-brand-gold/90 text-brand-dark font-extrabold px-3 py-1.5 rounded-lg text-xs"
+                            >
+                              Mark as Paid
+                            </button>
+                          ) : (
+                            <span className="text-xs font-bold uppercase tracking-wider text-gray-400">{req.status}</span>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Earnings Table */}
+              <div className="bg-white rounded-3xl border border-brand-green/10 shadow-sm overflow-hidden">
+                <div className="p-6 bg-brand-cream/30 border-b border-brand-green/10 space-y-4">
+                  <h2 className="text-xl font-extrabold text-brand-dark">Earnings Table</h2>
+                  
+                  {/* Filters */}
+                  <div className="flex flex-wrap items-center gap-3">
+                    <select
+                      value={earnEmployeeId}
+                      onChange={e => setEarnEmployeeId(e.target.value)}
+                      className="px-3 py-2 rounded-xl border border-brand-green/20 focus:outline-none focus:ring-1 focus:ring-brand-gold bg-white text-xs text-brand-dark"
+                    >
+                      <option value="">All Employees</option>
+                      {activeEmployees.map((emp: any) => (
+                        <option key={emp.id} value={emp.id}>{emp.fullName}</option>
+                      ))}
+                    </select>
+
+                    <input
+                      type="text"
+                      placeholder="City..."
+                      value={earnCity}
+                      onChange={e => setEarnCity(e.target.value)}
+                      className="px-3 py-2 rounded-xl border border-brand-green/20 focus:outline-none focus:ring-1 focus:ring-brand-gold bg-white text-xs text-brand-dark"
+                    />
+
+                    <input
+                      type="date"
+                      value={earnFromDate}
+                      onChange={e => setEarnFromDate(e.target.value)}
+                      className="px-3 py-2 rounded-xl border border-brand-green/20 focus:outline-none focus:ring-1 focus:ring-brand-gold bg-white text-xs text-brand-dark"
+                    />
+
+                    <input
+                      type="date"
+                      value={earnToDate}
+                      onChange={e => setEarnToDate(e.target.value)}
+                      className="px-3 py-2 rounded-xl border border-brand-green/20 focus:outline-none focus:ring-1 focus:ring-brand-gold bg-white text-xs text-brand-dark"
+                    />
+
+                    <select
+                      value={earnStatus}
+                      onChange={e => setEarnStatus(e.target.value)}
+                      className="px-3 py-2 rounded-xl border border-brand-green/20 focus:outline-none focus:ring-1 focus:ring-brand-gold bg-white text-xs text-brand-dark"
+                    >
+                      <option value="">All Statuses</option>
+                      <option value="UNPAID">Unpaid</option>
+                      <option value="REQUESTED">Requested</option>
+                      <option value="PAID">Paid</option>
+                    </select>
+
+                    {selectedEarnIds.length > 0 && (
+                      <button
+                        onClick={handleBulkPay}
+                        className="bg-brand-gold hover:bg-brand-gold/90 text-brand-dark font-extrabold py-2 px-3 rounded-xl text-xs transition-colors"
+                      >
+                        Paid Selected ({selectedEarnIds.length})
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                <div className="overflow-x-auto max-h-[300px] overflow-y-auto">
+                  <table className="w-full text-left border-collapse text-brand-text">
+                    <thead>
+                      <tr className="bg-brand-cream/10 border-b border-brand-green/10 text-[10px] font-bold uppercase tracking-wider text-brand-dark">
+                        <th className="py-3 px-4 text-center">
+                          <input
+                            type="checkbox"
+                            checked={selectedEarnIds.length === allEarnings.length && allEarnings.length > 0}
+                            onChange={() => {
+                              if (selectedEarnIds.length === allEarnings.length) {
+                                setSelectedEarnIds([]);
+                              } else {
+                                setSelectedEarnIds(allEarnings.map(e => e.id));
+                              }
+                            }}
+                            className="h-3.5 w-3.5 text-brand-green focus:ring-brand-gold rounded cursor-pointer"
+                          />
+                        </th>
+                        <th className="py-3 px-4">Date</th>
+                        <th className="py-3 px-4">Employee</th>
+                        <th className="py-3 px-4">Jobs</th>
+                        <th className="py-3 px-4">Amount</th>
+                        <th className="py-3 px-4">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-brand-green/5 text-xs">
+                      {allEarnings.length === 0 ? (
+                        <tr>
+                          <td colSpan={6} className="py-8 text-center text-gray-400 font-bold">
+                            No daily earnings match the filters.
+                          </td>
+                        </tr>
+                      ) : (
+                        allEarnings.map((e: any) => (
+                          <tr key={e.id} className="hover:bg-brand-lightGreen/20 transition-colors">
+                            <td className="py-3 px-4 text-center">
+                              <input
+                                type="checkbox"
+                                checked={selectedEarnIds.includes(e.id)}
+                                onChange={() => {
+                                  setSelectedEarnIds(prev =>
+                                    prev.includes(e.id) ? prev.filter(x => x !== e.id) : [...prev, e.id]
+                                  );
+                                }}
+                                className="h-3.5 w-3.5 text-brand-green focus:ring-brand-gold rounded cursor-pointer"
+                              />
+                            </td>
+                            <td className="py-3 px-4 font-bold text-brand-dark">
+                              {new Date(e.date).toLocaleDateString()}
+                            </td>
+                            <td className="py-3 px-4">
+                              <div className="flex flex-col">
+                                <span className="font-extrabold text-brand-dark">{e.employee.fullName}</span>
+                                <span className="text-[9px] text-gray-400">{e.employee.city}</span>
+                              </div>
+                            </td>
+                            <td className="py-3 px-4 font-semibold">{e.jobsCompleted}</td>
+                            <td className="py-3 px-4 font-bold text-brand-dark">₹{parseFloat(e.totalAmount)}</td>
+                            <td className="py-3 px-4">
+                              <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${
+                                e.status === 'PAID' ? 'bg-green-100 text-green-800 border-green-200' :
+                                e.status === 'REQUESTED' ? 'bg-purple-100 text-purple-800 border-purple-200' :
+                                'bg-yellow-100 text-yellow-800 border-yellow-200'
+                              }`}>
+                                {e.status}
+                              </span>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+            </div>
+
+          </div>
+
+        </div>
+      )}
 
       {/* Document Viewer Modal */}
       {activeApp && (
@@ -644,7 +1169,13 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
                     {activeApp.status}
                   </span>
                 </div>
-                <div className="flex space-x-3 w-full sm:w-auto">
+                <div className="flex flex-wrap gap-2 w-full sm:w-auto justify-end">
+                  <button
+                    onClick={() => setShowHireModal(true)}
+                    className="flex-1 sm:flex-initial bg-brand-gold hover:bg-brand-gold/90 text-brand-dark font-extrabold px-4 py-2 rounded-xl text-xs shadow transition-colors"
+                  >
+                    🤝 Hire Candidate (Set PIN)
+                  </button>
                   <button
                     onClick={() => updateStatus(activeApp.id, 'SHORTLISTED')}
                     className="flex-1 sm:flex-initial bg-green-600 hover:bg-green-700 text-white font-bold px-4 py-2 rounded-xl text-xs shadow transition-colors"
@@ -793,6 +1324,124 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
             </div>
 
           </div>
+        </div>
+      )}
+
+      {/* Hiring Confirmation & Set PIN Modal */}
+      {showHireModal && activeApp && (
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-brand-dark/40 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in">
+          <div className="bg-white rounded-3xl max-w-sm w-full border border-brand-green/10 shadow-2xl p-6 space-y-6">
+            <h3 className="text-xl font-extrabold text-brand-dark">🤝 Hire Candidate</h3>
+            
+            <p className="text-xs text-brand-text leading-relaxed font-semibold">
+              You are hiring <strong>{activeApp.fullName}</strong>. Set a 4-digit PIN for them to log into the Cleaner Portal.
+            </p>
+
+            <div className="space-y-1">
+              <label className="block text-[10px] font-bold text-brand-dark uppercase tracking-wider">4-Digit PIN</label>
+              <input
+                type="password"
+                maxLength={4}
+                required
+                placeholder="e.g. 1234"
+                value={hirePin}
+                onChange={e => {
+                  if (/^\d*$/.test(e.target.value)) setHirePin(e.target.value);
+                }}
+                className="w-full px-3 py-2.5 rounded-xl border border-brand-green/20 focus:outline-none focus:ring-1 focus:ring-brand-gold bg-brand-cream/10 text-center text-lg font-bold tracking-widest text-brand-dark"
+              />
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowHireModal(false);
+                  setHirePin('');
+                }}
+                className="flex-1 bg-brand-cream text-brand-green font-bold py-2.5 rounded-xl text-xs border border-brand-green/15"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={hiring || hirePin.length < 4}
+                onClick={() => handleHire(activeApp.id)}
+                className="flex-1 bg-brand-green hover:bg-brand-green/90 text-white font-extrabold py-2.5 rounded-xl text-xs shadow disabled:opacity-50"
+              >
+                {hiring ? 'Hiring...' : 'Confirm Hire'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Payout Action Confirmation Modal */}
+      {payoutActionRequest && (
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-brand-dark/40 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in">
+          <form 
+            onSubmit={handlePayoutAction}
+            className="bg-white rounded-3xl max-w-sm w-full border border-brand-green/10 shadow-2xl p-6 space-y-6"
+          >
+            <h3 className="text-xl font-extrabold text-brand-dark">💰 Update Payout Status</h3>
+            
+            <div className="space-y-1">
+              <p className="text-xs text-brand-text font-semibold">
+                Employee: <strong>{payoutActionRequest.employee.fullName}</strong>
+              </p>
+              <p className="text-xs text-brand-text font-semibold">
+                Amount: <strong>₹{payoutActionRequest.amount}</strong> ({payoutActionRequest.method})
+              </p>
+              <p className="text-xs text-brand-text font-semibold">
+                Action: <strong className="uppercase">{payoutActionStatus}</strong>
+              </p>
+            </div>
+
+            {payoutActionStatus === 'PAID' && (
+              <div className="space-y-1">
+                <label className="block text-[10px] font-bold text-brand-dark uppercase tracking-wider">Transaction Reference ID (optional)</label>
+                <input
+                  type="text"
+                  placeholder="e.g. TXN123456789"
+                  value={paidTxnId}
+                  onChange={e => setPaidTxnId(e.target.value)}
+                  className="w-full px-3 py-2.5 rounded-xl border border-brand-green/20 focus:outline-none focus:ring-1 focus:ring-brand-gold bg-brand-cream/10 text-xs text-brand-dark"
+                />
+              </div>
+            )}
+
+            <div className="space-y-1">
+              <label className="block text-[10px] font-bold text-brand-dark uppercase tracking-wider">Admin Notes (optional)</label>
+              <textarea
+                placeholder="Enter notes..."
+                rows={2}
+                value={payoutAdminNotes}
+                onChange={e => setPayoutAdminNotes(e.target.value)}
+                className="w-full px-3 py-2.5 rounded-xl border border-brand-green/20 focus:outline-none focus:ring-1 focus:ring-brand-gold bg-brand-cream/10 text-xs text-brand-dark"
+              />
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setPayoutActionRequest(null);
+                  setPaidTxnId('');
+                  setPayoutAdminNotes('');
+                }}
+                className="flex-1 bg-brand-cream text-brand-green font-bold py-2.5 rounded-xl text-xs border border-brand-green/15"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={payoutActionLoading}
+                className="flex-1 bg-brand-green hover:bg-brand-green/90 text-white font-extrabold py-2.5 rounded-xl text-xs shadow disabled:opacity-50"
+              >
+                {payoutActionLoading ? 'Saving...' : 'Confirm'}
+              </button>
+            </div>
+          </form>
         </div>
       )}
 
