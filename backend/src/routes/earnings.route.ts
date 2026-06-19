@@ -380,11 +380,11 @@ router.get('/employee/my-earnings', authenticateEmployee, async (req, res) => {
     });
 
     const totalEarned = earnings.reduce(
-      (sum, e) => sum + Number(e.totalAmount), 0
+      (sum: number, e: any) => sum + Number(e.totalAmount), 0
     );
     const totalUnpaid = earnings
-      .filter(e => e.status === 'UNPAID')
-      .reduce((sum, e) => sum + Number(e.totalAmount), 0);
+      .filter((e: any) => e.status === 'UNPAID')
+      .reduce((sum: number, e: any) => sum + Number(e.totalAmount), 0);
 
     res.json({ earnings, totalEarned, totalUnpaid });
   } catch (error: any) {
@@ -418,7 +418,7 @@ router.post('/employee/request-payout', authenticateEmployee, async (req, res) =
     }
 
     const amount = unpaidEarnings.reduce(
-      (sum, e) => sum + Number(e.totalAmount), 0
+      (sum: number, e: any) => sum + Number(e.totalAmount), 0
     );
 
     const requestId = `SH-PAY-${Date.now().toString(36).toUpperCase()}`;
@@ -440,7 +440,7 @@ router.post('/employee/request-payout', authenticateEmployee, async (req, res) =
 
     // Mark earnings as requested
     await prisma.dailyEarning.updateMany({
-      where: { id: { in: unpaidEarnings.map(e => e.id) } },
+      where: { id: { in: unpaidEarnings.map((e: any) => e.id) } },
       data : { status: 'REQUESTED' }
     });
 
