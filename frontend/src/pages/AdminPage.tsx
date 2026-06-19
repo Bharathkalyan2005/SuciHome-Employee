@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react';
-import { LogIn, Users, Clock, CheckCircle, XCircle, Search, Download, MessageSquare, Eye, RefreshCw, Send, Check } from 'lucide-react';
-import { API_BASE_URL } from '../config';
+import { useState, useEffect } from 'react'
+import api from '../lib/axiosInstance'
+import toast from 'react-hot-toast'
+import { Users, Clock, CheckCircle, XCircle, Search, Download, MessageSquare, Eye, RefreshCw, Send, Check } from 'lucide-react'
 
 interface Application {
   id: string;
@@ -34,98 +35,229 @@ interface Stats {
   rejected: number;
 }
 
-export default function Admin() {
-  // Auth State
-  const [token, setToken] = useState<string>(localStorage.getItem('sucihome_admin_token') || '');
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
-  const [authError, setAuthError] = useState('');
-  const [authLoading, setAuthLoading] = useState(false);
+export default function AdminPage() {
+  const [isLoggedIn, setIsLoggedIn] = useState(false)
+  const [checking,   setChecking]   = useState(true)
+  const [email,      setEmail]      = useState('')
+  const [password,   setPassword]   = useState('')
+  const [loading,    setLoading]    = useState(false)
 
-  // Applications & Stats State
+  // Check existing session on load
+  useEffect(() => {
+    const token = localStorage.getItem('sucihome_admin_token')
+    if (token) {
+      try {
+        const decoded = JSON.parse(atob(token.split('.')[1]))
+        const expired = decoded.exp * 1000 < Date.now()
+        if (!expired) {
+          setIsLoggedIn(true)
+        } else {
+          localStorage.removeItem('sucihome_admin_token')
+        }
+      } catch {
+        localStorage.removeItem('sucihome_admin_token')
+      }
+    }
+    setChecking(false)
+  }, [])
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setLoading(true)
+    try {
+      const res = await api.post('/auth/admin-login', {
+        email, password
+      })
+      localStorage.setItem(
+        'sucihome_admin_token', 
+        res.data.token
+      )
+      setIsLoggedIn(true)
+      toast.success('Welcome back, Admin!')
+    } catch (err: any) {
+      toast.error(
+        err.response?.data?.error || 
+        'Invalid email or password'
+      )
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  if (checking) return null
+
+  // LOGIN FORM — shown when not logged in
+  if (!isLoggedIn) {
+    return (
+      <div style={{
+        minHeight     : '100vh',
+        background    : '#F5F0E8',
+        display       : 'flex',
+        alignItems    : 'center',
+        justifyContent: 'center',
+        padding       : '24px',
+      }}>
+        <form
+          onSubmit={handleLogin}
+          style={{
+            background   : '#FFFFFF',
+            borderRadius : '24px',
+            padding      : '40px',
+            width        : '100%',
+            maxWidth     : '400px',
+            boxShadow    : '0 8px 40px rgba(27,67,50,0.12)',
+            border       : '1px solid rgba(27,67,50,0.1)',
+          }}
+        >
+          <div style={{ textAlign: 'center', marginBottom: '28px' }}>
+            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '12px' }}>
+              <div style={{
+                background: '#1B4332',
+                padding: '10px',
+                borderRadius: '12px',
+                color: '#D4AF37',
+              }}>
+                <span style={{ fontSize: '24px', fontWeight: 'bold' }}>⚙️</span>
+              </div>
+            </div>
+            <h2 style={{
+              color     : '#0D2B1F',
+              fontSize  : '22px',
+              fontWeight: '700',
+              fontFamily: 'serif',
+              margin    : '0 0 4px',
+            }}>
+              Admin Login
+            </h2>
+            <p style={{ color: '#5C6B5E', fontSize: '13px', margin: '0' }}>
+              HR Dashboard Access
+            </p>
+          </div>
+
+          <label style={{
+            color: '#2D4A35', fontSize: '13px',
+            fontWeight: '600', display: 'block',
+            marginBottom: '6px',
+          }}>
+            Email
+          </label>
+          <input
+            type="email"
+            value={email}
+            onChange={e => setEmail(e.target.value)}
+            placeholder="Welcome@vrcpvtltd.com"
+            required
+            style={{
+              width       : '100%',
+              padding     : '12px 14px',
+              border      : '1px solid rgba(27,67,50,0.2)',
+              borderRadius: '10px',
+              marginBottom: '16px',
+              fontSize    : '14px',
+              outline     : 'none',
+              boxSizing   : 'border-box'
+            }}
+          />
+
+          <label style={{
+            color: '#2D4A35', fontSize: '13px',
+            fontWeight: '600', display: 'block',
+            marginBottom: '6px',
+          }}>
+            Password
+          </label>
+          <input
+            type="password"
+            value={password}
+            onChange={e => setPassword(e.target.value)}
+            placeholder="••••••••"
+            required
+            style={{
+              width       : '100%',
+              padding     : '12px 14px',
+              border      : '1px solid rgba(27,67,50,0.2)',
+              borderRadius: '10px',
+              marginBottom: '24px',
+              fontSize    : '14px',
+              outline     : 'none',
+              boxSizing   : 'border-box'
+            }}
+          />
+
+          <button
+            type="submit"
+            disabled={loading}
+            style={{
+              width       : '100%',
+              padding     : '14px',
+              background  : '#1B4332',
+              color       : '#FFFFFF',
+              border      : 'none',
+              borderRadius: '12px',
+              fontWeight  : '700',
+              fontSize    : '15px',
+              cursor      : loading ? 'wait' : 'pointer',
+              opacity     : loading ? 0.7 : 1,
+            }}
+          >
+            {loading ? 'Logging in...' : 'Login to Dashboard'}
+          </button>
+        </form>
+      </div>
+    )
+  }
+
+  // DASHBOARD — shown when logged in
+  return (
+    <AdminDashboard
+      onLogout={() => {
+        localStorage.removeItem('sucihome_admin_token')
+        setIsLoggedIn(false)
+      }}
+    />
+  )
+}
+
+function AdminDashboard({ onLogout }: { onLogout: () => void }) {
   const [applications, setApplications] = useState<Application[]>([]);
   const [stats, setStats] = useState<Stats>({ total: 0, pending: 0, shortlisted: 0, rejected: 0 });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  // Filtering State
   const [search, setSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
   const [filterPosition, setFilterPosition] = useState('');
 
-  // Row Selection (For bulk WhatsApp)
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [bulkMessage, setBulkMessage] = useState('Dear {name}, we are pleased to inform you that you have been shortlisted for the SuciHome role. Please report to VRC Office on Monday. Contact: 9392420643.');
   const [bulkSending, setBulkSending] = useState(false);
   const [bulkSuccessMsg, setBulkSuccessMsg] = useState('');
 
-  // Modal / Detail Viewer
   const [activeApp, setActiveApp] = useState<Application | null>(null);
 
-  // Load Data if Token exists
   useEffect(() => {
-    if (token) {
-      fetchData();
-    }
-  }, [token, filterStatus, filterPosition]);
-
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setAuthLoading(true);
-    setAuthError('');
-    try {
-      const res = await fetch(`${API_BASE_URL}/admin/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || 'Authentication failed');
-      }
-      localStorage.setItem('sucihome_admin_token', data.token);
-      setToken(data.token);
-    } catch (err: any) {
-      setAuthError(err.message || 'Login failed');
-    } finally {
-      setAuthLoading(false);
-    }
-  };
-
-  const handleLogout = () => {
-    localStorage.removeItem('sucihome_admin_token');
-    setToken('');
-    setApplications([]);
-  };
+    fetchData();
+  }, [filterStatus, filterPosition]);
 
   const fetchData = async () => {
     setLoading(true);
     setError('');
     try {
-      // Fetch Stats
-      const statsRes = await fetch(`${API_BASE_URL}/admin/stats`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!statsRes.ok) throw new Error('Failed to fetch statistics');
-      const statsData = await statsRes.json();
-      setStats(statsData);
+      const statsRes = await api.get('/admin/stats');
+      setStats(statsRes.data);
 
-      // Fetch Applications (with filters query)
-      let url = `${API_BASE_URL}/admin/applications?`;
+      let url = '/admin/applications?';
       if (filterStatus) url += `status=${filterStatus}&`;
       if (filterPosition) url += `position=${filterPosition}&`;
       if (search) url += `search=${encodeURIComponent(search)}&`;
 
-      const appRes = await fetch(url, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!appRes.ok) throw new Error('Failed to fetch application records');
-      const appData = await appRes.json();
-      setApplications(appData);
+      const appRes = await api.get(url);
+      setApplications(appRes.data);
     } catch (err: any) {
-      setError(err.message || 'Error syncing database records');
-      if (err.message?.includes('token') || err.message?.includes('expired')) {
-        handleLogout();
+      const errMsg = err.response?.data?.error || err.message || 'Error syncing database records';
+      setError(errMsg);
+      if (err.response?.status === 401 || err.response?.status === 403) {
+        onLogout();
       }
     } finally {
       setLoading(false);
@@ -134,48 +266,35 @@ export default function Admin() {
 
   const updateStatus = async (appId: string, status: 'SHORTLISTED' | 'REJECTED') => {
     try {
-      const res = await fetch(`${API_BASE_URL}/admin/applications/${appId}/status`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ status }),
-      });
-      if (!res.ok) throw new Error('Failed to update status');
-      
-      // Update local state
+      await api.patch(`/admin/applications/${appId}/status`, { status });
       setApplications(prev => prev.map(app => app.id === appId ? { ...app, status } : app));
       if (activeApp && activeApp.id === appId) {
         setActiveApp(prev => prev ? { ...prev, status } : null);
       }
-      
-      // Sync dashboard data
+      toast.success(`Candidate status updated to ${status}`);
       fetchData();
     } catch (err: any) {
-      alert(err.message || 'Failed to update application status');
+      const errMsg = err.response?.data?.error || err.message || 'Failed to update status';
+      toast.error(errMsg);
     }
   };
 
-  const handleCSVExport = () => {
-    window.open(`${API_BASE_URL}/admin/applications/export?Authorization=Bearer ${token}`, '_blank');
-    // Using simple fetch to trigger native save download
-    fetch(`${API_BASE_URL}/admin/applications/export`, {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-      .then(res => res.blob())
-      .then(blob => {
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `sucihome_applicants_${new Date().toISOString().slice(0, 10)}.csv`;
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-      });
+  const handleCSVExport = async () => {
+    try {
+      const res = await api.get('/admin/applications/export', { responseType: 'blob' });
+      const url = window.URL.createObjectURL(new Blob([res.data]));
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `sucihome_applicants_${new Date().toISOString().slice(0, 10)}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      toast.success('CSV Export successful!');
+    } catch (err: any) {
+      toast.error('Failed to export CSV file');
+    }
   };
 
-  // Checkbox row toggler
   const handleSelectRow = (id: string) => {
     setSelectedIds(prev =>
       prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
@@ -193,26 +312,19 @@ export default function Admin() {
   const handleBulkWhatsAppSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (selectedIds.length === 0) {
-      alert('Please select at least one applicant.');
+      toast.error('Please select at least one applicant.');
       return;
     }
     setBulkSending(true);
     setBulkSuccessMsg('');
     try {
-      const res = await fetch(`${API_BASE_URL}/admin/applications/bulk-whatsapp`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ ids: selectedIds, message: bulkMessage }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed to send bulk WhatsApp messages');
-      setBulkSuccessMsg(data.message);
+      const res = await api.post('/admin/applications/bulk-whatsapp', { ids: selectedIds, message: bulkMessage });
+      setBulkSuccessMsg(res.data.message);
+      toast.success(res.data.message);
       setSelectedIds([]);
     } catch (err: any) {
-      alert(err.message || 'Error dispatching bulk WhatsApp campaigns');
+      const errMsg = err.response?.data?.error || err.message || 'Error dispatching bulk WhatsApp campaigns';
+      toast.error(errMsg);
     } finally {
       setBulkSending(false);
     }
@@ -229,71 +341,8 @@ export default function Admin() {
     }
   };
 
-  // Render Login Panel
-  if (!token) {
-    return (
-      <div className="min-h-[70vh] flex items-center justify-center px-4 py-12">
-        <div className="w-full max-w-md bg-white rounded-3xl p-8 border border-brand-green/10 shadow-xl space-y-6">
-          <div className="text-center space-y-2">
-            <span className="text-brand-gold font-bold text-xs uppercase tracking-widest bg-brand-green/10 px-4 py-1.5 rounded-full">
-              HR Administration
-            </span>
-            <h1 className="text-3xl font-extrabold text-brand-dark">Admin Login</h1>
-            <p className="text-brand-text text-sm">Enter credential keys to access candidate databases.</p>
-          </div>
-
-          {authError && (
-            <div className="flex items-center space-x-2 text-red-600 bg-red-50 p-4 rounded-xl border border-red-200 text-sm font-medium">
-              <AlertCircleIcon className="h-5 w-5 shrink-0" />
-              <span>{authError}</span>
-            </div>
-          )}
-
-          <form onSubmit={handleLogin} className="space-y-4">
-            <div className="space-y-2">
-              <label className="block text-xs font-bold text-brand-dark uppercase tracking-wider">Username</label>
-              <input
-                type="text"
-                required
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                placeholder="admin"
-                className="w-full px-4 py-3 rounded-xl border border-brand-green/20 focus:outline-none focus:ring-2 focus:ring-brand-gold bg-brand-cream/20 text-brand-dark"
-              />
-            </div>
-            <div className="space-y-2">
-              <label className="block text-xs font-bold text-brand-dark uppercase tracking-wider">Password</label>
-              <input
-                type="password"
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
-                className="w-full px-4 py-3 rounded-xl border border-brand-green/20 focus:outline-none focus:ring-2 focus:ring-brand-gold bg-brand-cream/20 text-brand-dark"
-              />
-            </div>
-
-            <button
-              type="submit"
-              disabled={authLoading}
-              className="w-full bg-brand-green hover:bg-brand-green/90 text-white font-extrabold py-3.5 rounded-xl transition-colors shadow-md disabled:opacity-50 flex items-center justify-center space-x-2 text-sm"
-            >
-              <LogIn className="h-4 w-4 text-brand-gold" />
-              <span>{authLoading ? 'Verifying...' : 'Sign In'}</span>
-            </button>
-          </form>
-          <div className="text-center">
-            <span className="text-[10px] text-gray-400 font-semibold uppercase">Powered by VRC Pvt Ltd Onboarding Systems</span>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // Render Logged-in Dashboard
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8">
-      
       {/* Header and Logout */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
@@ -301,7 +350,7 @@ export default function Admin() {
           <p className="text-brand-text text-sm">Review applications, filter fields, export databases, and dispatch WhatsApp alerts.</p>
         </div>
         <button
-          onClick={handleLogout}
+          onClick={onLogout}
           className="bg-brand-cream border border-brand-green/10 text-brand-green hover:bg-red-50 hover:text-red-600 hover:border-red-200 font-bold px-6 py-2.5 rounded-xl text-sm transition-all shadow-sm"
         >
           Sign Out
@@ -559,7 +608,7 @@ export default function Admin() {
       {/* Document Viewer Modal */}
       {activeApp && (
         <div className="fixed inset-0 z-50 overflow-y-auto bg-brand-dark/40 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-3xl w-full border border-brand-green/10 shadow-2xl overflow-hidden animate-float-scale">
+          <div className="bg-white rounded-3xl max-w-3xl w-full border border-brand-green/10 shadow-2xl overflow-hidden">
             
             {/* Modal Header */}
             <div className="p-6 bg-brand-dark text-white flex justify-between items-center border-b-2 border-brand-gold">
@@ -751,7 +800,6 @@ export default function Admin() {
   );
 }
 
-// Simple icons inside this file
 function AlertCircleIcon(props: React.SVGProps<SVGSVGElement>) {
   return (
     <svg

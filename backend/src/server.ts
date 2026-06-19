@@ -11,6 +11,7 @@ import { multerUpload, uploadToCloudinaryOrLocal } from './utils/uploader';
 import { encryptAadhaar, decryptAadhaar, hashAadhaar } from './utils/crypto';
 import { sendRegistrationNotifications, sendWhatsApp } from './utils/notifications';
 import { requireAdmin, AuthenticatedRequest } from './middleware/auth';
+import { authenticateAdmin } from './middleware/adminAuth';
 
 dotenv.config();
 
@@ -298,9 +299,59 @@ app.post('/api/admin/login', async (req, res) => {
 });
 
 /**
+ * Endpoint: Secure Admin Login
+ */
+app.post('/api/auth/admin-login', async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    if (!email || !password) {
+      return res.status(400).json({ error: 'Email and password are required' });
+    }
+
+    const admin = await prisma.admin.findUnique({
+      where: { username: email }
+    });
+
+    if (!admin) {
+      return res.status(401).json({ 
+        error: 'Invalid email or password' 
+      });
+    }
+
+    const valid = await bcrypt.compare(password, admin.password);
+    if (!valid) {
+      return res.status(401).json({ 
+        error: 'Invalid email or password' 
+      });
+    }
+
+    const token = jwt.sign(
+      { 
+        adminId: admin.id, 
+        email  : admin.username,
+        name   : admin.name
+      },
+      JWT_SECRET,
+      { expiresIn: '8h' }
+    );
+
+    return res.json({
+      token,
+      admin: {
+        email: admin.username,
+        name: admin.name
+      }
+    });
+  } catch (error: any) {
+    console.error('Admin login error:', error);
+    return res.status(500).json({ error: 'Login failed' });
+  }
+});
+
+/**
  * Endpoint: Admin Stats
  */
-app.get('/api/admin/stats', requireAdmin, async (req, res) => {
+app.get('/api/admin/stats', authenticateAdmin, async (req, res) => {
   try {
     const total = await prisma.application.count();
     const pending = await prisma.application.count({ where: { status: 'PENDING' } });
@@ -321,7 +372,7 @@ app.get('/api/admin/stats', requireAdmin, async (req, res) => {
 /**
  * Endpoint: List Admin Applications (Search, Filters)
  */
-app.get('/api/admin/applications', requireAdmin, async (req: AuthenticatedRequest, res) => {
+app.get('/api/admin/applications', authenticateAdmin, async (req, res) => {
   try {
     const { search, status, position } = req.query;
 
@@ -371,7 +422,7 @@ app.get('/api/admin/applications', requireAdmin, async (req: AuthenticatedReques
 /**
  * Endpoint: Update Application Status
  */
-app.patch('/api/admin/applications/:id/status', requireAdmin, async (req, res) => {
+app.patch('/api/admin/applications/:id/status', authenticateAdmin, async (req, res) => {
   try {
     const { id } = req.params;
     const { status } = req.body;
@@ -408,7 +459,7 @@ app.patch('/api/admin/applications/:id/status', requireAdmin, async (req, res) =
 /**
  * Endpoint: Bulk WhatsApp Messaging
  */
-app.post('/api/admin/applications/bulk-whatsapp', requireAdmin, async (req, res) => {
+app.post('/api/admin/applications/bulk-whatsapp', authenticateAdmin, async (req, res) => {
   try {
     const { ids, message } = req.body;
 
@@ -440,7 +491,7 @@ app.post('/api/admin/applications/bulk-whatsapp', requireAdmin, async (req, res)
 /**
  * Endpoint: Export CSV
  */
-app.get('/api/admin/applications/export', requireAdmin, async (req, res) => {
+app.get('/api/admin/applications/export', authenticateAdmin, async (req, res) => {
   try {
     const applications = await prisma.application.findMany({
       orderBy: { createdAt: 'desc' },

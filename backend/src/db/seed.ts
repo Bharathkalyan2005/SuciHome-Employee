@@ -25,7 +25,7 @@ async function main() {
   const newAdmins = [
     {
       username: 'Welcome@vrcpvtltd.com',
-      password: 'SuciHome@567',
+      password: 'Sucihome@567',
       name: 'SuciHome HR Admin'
     },
     {

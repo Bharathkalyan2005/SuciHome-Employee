@@ -1,10 +1,11 @@
 import { useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
-import { Menu, X, Sparkles, UserCheck } from 'lucide-react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Menu, X, Sparkles } from 'lucide-react';
 
 export default function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
   const location = useLocation();
+  const navigate = useNavigate();
 
   const navLinks = [
     { name: 'Home', path: '/' },
@@ -54,13 +55,25 @@ export default function Navbar() {
                 {link.name}
               </Link>
             ))}
-            <Link
-              to="/admin"
-              className="ml-4 flex items-center space-x-1.5 bg-brand-gold hover:bg-brand-gold/90 text-brand-dark px-4 py-2 rounded-lg text-sm font-bold shadow-md transition-all duration-200"
+            <button
+              onClick={() => navigate('/admin')}
+              style={{
+                display     : 'flex',
+                alignItems  : 'center',
+                gap         : '6px',
+                background  : '#1B4332',
+                color       : '#FFFFFF',
+                border      : 'none',
+                borderRadius: '20px',
+                padding     : '8px 16px',
+                cursor      : 'pointer',
+                fontSize    : '14px',
+                fontWeight  : '600',
+                marginLeft  : '16px'
+              }}
             >
-              <UserCheck className="h-4 w-4" />
-              <span>Admin</span>
-            </Link>
+              ⚙️ Admin
+            </button>
           </div>
 
           {/* Mobile menu button */}
@@ -97,13 +110,30 @@ export default function Navbar() {
                 {link.name}
               </Link>
             ))}
-            <Link
-              to="/admin"
-              onClick={() => setIsOpen(false)}
-              className="block text-center mt-4 bg-brand-gold text-brand-dark px-4 py-3 rounded-lg text-base font-bold shadow-md"
+            <button
+              onClick={() => {
+                setIsOpen(false);
+                navigate('/admin');
+              }}
+              style={{
+                display     : 'flex',
+                alignItems  : 'center',
+                justifyContent: 'center',
+                gap         : '6px',
+                background  : '#1B4332',
+                color       : '#FFFFFF',
+                border      : 'none',
+                borderRadius: '20px',
+                padding     : '12px 24px',
+                cursor      : 'pointer',
+                fontSize    : '16px',
+                fontWeight  : '600',
+                width       : '100%',
+                marginTop   : '16px'
+              }}
             >
-              Admin Dashboard
-            </Link>
+              ⚙️ Admin Dashboard
+            </button>
           </div>
         </div>
       )}

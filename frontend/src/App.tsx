@@ -1,5 +1,6 @@
-import { useEffect } from 'react';
+import { useEffect, Suspense, lazy } from 'react';
 import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
+import { Toaster } from 'react-hot-toast';
 
 // Components
 import Navbar from './components/Navbar';
@@ -12,7 +13,20 @@ import Careers from './pages/Careers';
 import Register from './pages/Register';
 import Status from './pages/Status';
 import Contact from './pages/Contact';
-import Admin from './pages/Admin';
+
+const AdminPage = lazy(() => 
+  import('./pages/AdminPage').catch(err => {
+    console.error('AdminPage failed to load:', err);
+    return { 
+      default: () => (
+        <div style={{ padding: '100px', textAlign: 'center' }}>
+          <h2>Admin page failed to load</h2>
+          <p>{String(err)}</p>
+        </div>
+      ) 
+    };
+  })
+);
 
 // Scroll To Top on route change helper
 function ScrollToTop() {
@@ -29,6 +43,7 @@ function App() {
   return (
     <Router>
       <ScrollToTop />
+      <Toaster position="top-center" />
       <div className="flex flex-col min-h-screen bg-brand-cream text-brand-text">
         <Navbar />
         
@@ -41,7 +56,11 @@ function App() {
             <Route path="/register" element={<Register />} />
             <Route path="/status" element={<Status />} />
             <Route path="/contact" element={<Contact />} />
-            <Route path="/admin" element={<Admin />} />
+            <Route path="/admin" element={
+              <Suspense fallback={<div className="py-20 text-center text-brand-green font-bold">Loading admin...</div>}>
+                <AdminPage />
+              </Suspense>
+            } />
             <Route path="*" element={
               <div className="max-w-md mx-auto py-20 px-4 text-center space-y-4">
                 <h2 className="text-3xl font-extrabold text-brand-dark">Page Not Found</h2>
@@ -59,3 +78,4 @@ function App() {
 }
 
 export default App;
+
